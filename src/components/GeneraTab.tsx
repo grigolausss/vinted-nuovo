@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Trash2, ArrowRight } from 'lucide-react';
+import { Sparkles, Trash2, ArrowRight, Loader2 } from 'lucide-react';
 import { OutputCard } from './OutputCard';
 import {
   generateSeoTitles,
@@ -23,34 +23,52 @@ export const GeneraTab: React.FC<GeneraTabProps> = ({ onArchive }) => {
     useEmoji: false,
   });
   const [output, setOutput] = useState<GeneratedListing | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [warning, setWarning] = useState<string | null>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     titleInputRef.current?.focus();
-  }, []);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.metaKey && e.key === 'Enter') {
+        handleGenerate();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [input]);
 
   const handleGenerate = () => {
-    if (!input.title) return;
+    if (!input.title || isGenerating) return;
 
-    setWarning(honestyChecker(input));
+    setIsGenerating(true);
+    setOutput(null);
+    setWarning(null);
 
-    const seoTitles = generateSeoTitles(input.title);
-    const optimizedDescription = generateDescription(input);
-    const categories = suggestCategories(input.title);
-    const price = suggestPrice(input.title);
+    // Simulazione di processamento per feedback utente
+    setTimeout(() => {
+      setWarning(honestyChecker(input));
 
-    setOutput({
-      id: Math.random().toString(36).substring(2, 9),
-      originalTitle: input.title,
-      seoTitles,
-      optimizedDescription,
-      categories,
-      price,
-      createdAt: new Date().toISOString(),
-      status: 'Non venduto',
-      daysElapsed: 0,
-    });
+      const seoTitles = generateSeoTitles(input.title, input.description);
+      const optimizedDescription = generateDescription(input);
+      const categories = suggestCategories(input.title);
+      const price = suggestPrice(input.title);
+
+      setOutput({
+        id: Math.random().toString(36).substring(2, 9),
+        originalTitle: input.title,
+        seoTitles,
+        optimizedDescription,
+        categories,
+        price,
+        createdAt: new Date().toISOString(),
+        status: 'Non venduto',
+        daysElapsed: 0,
+      });
+      setIsGenerating(false);
+    }, 1200);
   };
 
   const handleClear = () => {
@@ -113,11 +131,15 @@ export const GeneraTab: React.FC<GeneraTabProps> = ({ onArchive }) => {
           <div className="flex gap-4 mt-4">
             <button
               onClick={handleGenerate}
-              disabled={!input.title}
+              disabled={!input.title || isGenerating}
               className="apple-button-primary flex-1 flex items-center justify-center gap-2"
             >
-              <Sparkles size={18} />
-              Genera
+              {isGenerating ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <Sparkles size={18} />
+              )}
+              {isGenerating ? 'Generazione...' : 'Genera'}
             </button>
             <button
               onClick={handleClear}
@@ -143,7 +165,21 @@ export const GeneraTab: React.FC<GeneraTabProps> = ({ onArchive }) => {
       {/* Colonna Destra: Output */}
       <div className="flex flex-col gap-6 overflow-y-auto pr-2 scrollbar-hide">
         <AnimatePresence mode="wait">
-          {!output ? (
+          {isGenerating ? (
+            <motion.div
+              key="loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="h-full flex flex-col items-center justify-center gap-4"
+            >
+              <div className="relative">
+                <div className="w-16 h-16 border-4 border-apple-blue/10 border-t-apple-blue rounded-full animate-spin" />
+                <Sparkles className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-apple-blue" size={24} />
+              </div>
+              <p className="text-sm font-medium text-apple-blue animate-pulse">Analisi e generazione in corso...</p>
+            </motion.div>
+          ) : !output ? (
             <motion.div
               key="empty"
               initial={{ opacity: 0 }}

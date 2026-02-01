@@ -46,8 +46,8 @@ function smartCapitalize(text: string): string {
 function interpretTechnicalDetails(text: string): string {
   let processed = text;
 
-  // Interpreta percentuali (es. 98 cotone -> 98% cotone)
-  processed = processed.replace(/(\d+)\s*(cotone|elastene|elastane|lana|poliestere|seta|lino|viscosa)/gi, '$1% $2');
+  // Interpreta percentuali (es. 98 cotone -> 98% cotone), evitando doppioni se già presente
+  processed = processed.replace(/(\d+)(?!\s*%)\s*(cotone|elastene|elastane|lana|poliestere|seta|lino|viscosa)/gi, '$1% $2');
 
   // Aggiunge virgole tra componenti (es. 98% cotone 2% elastene -> 98% cotone, 2% elastene)
   processed = processed.replace(/(%\s+\w+)\s+(\d+%)/gi, '$1, $2');
