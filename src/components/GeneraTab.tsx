@@ -8,6 +8,7 @@ import {
   suggestCategories,
   suggestPrice,
   honestyChecker,
+  enrichData,
   ListingInput,
   GeneratedListing
 } from '../logic';
@@ -29,16 +30,22 @@ export const GeneraTab: React.FC<GeneraTabProps> = ({ onArchive }) => {
 
   useEffect(() => {
     titleInputRef.current?.focus();
+  }, []);
 
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.metaKey && e.key === 'Enter') {
         handleGenerate();
+      }
+      if (e.metaKey && e.key === 'Backspace') {
+        e.preventDefault();
+        handleClear();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [input]);
+  }, [input, isGenerating]); // handleGenerate depends on these
 
   const handleGenerate = () => {
     if (!input.title || isGenerating) return;
@@ -51,8 +58,9 @@ export const GeneraTab: React.FC<GeneraTabProps> = ({ onArchive }) => {
     setTimeout(() => {
       setWarning(honestyChecker(input));
 
+      const enrichment = enrichData(input.title, input.description);
       const seoTitles = generateSeoTitles(input.title, input.description);
-      const optimizedDescription = generateDescription(input);
+      const optimizedDescription = generateDescription(input, enrichment);
       const categories = suggestCategories(input.title);
       const price = suggestPrice(input.title);
 
@@ -66,6 +74,7 @@ export const GeneraTab: React.FC<GeneraTabProps> = ({ onArchive }) => {
         createdAt: new Date().toISOString(),
         status: 'Non venduto',
         daysElapsed: 0,
+        enrichedData: enrichment || undefined
       });
       setIsGenerating(false);
     }, 1200);
@@ -157,6 +166,20 @@ export const GeneraTab: React.FC<GeneraTabProps> = ({ onArchive }) => {
               className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-sm"
             >
               {warning}
+            </motion.div>
+          )}
+
+          {output?.enrichedData && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-4 bg-apple-blue/5 border border-apple-blue/20 rounded-xl text-apple-blue text-xs flex flex-col gap-2"
+            >
+              <div className="flex items-center gap-2 font-bold uppercase tracking-wider">
+                <Sparkles size={14} />
+                Arricchimento Intelligente
+              </div>
+              <p>Per questo oggetto ({output.enrichedData.itemName}) ho aggiunto le seguenti info trovate in rete: <b>{output.enrichedData.addedInfo.join(", ")}</b>. Sono corrette?</p>
             </motion.div>
           )}
         </div>

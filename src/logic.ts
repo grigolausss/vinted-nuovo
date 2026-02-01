@@ -27,6 +27,10 @@ export interface GeneratedListing {
   createdAt: string;
   status: 'Non venduto' | 'Venduto' | 'In pausa';
   daysElapsed: number;
+  enrichedData?: {
+    addedInfo: string[];
+    itemName: string;
+  };
 }
 
 /**
@@ -59,67 +63,144 @@ function interpretTechnicalDetails(text: string): string {
 }
 
 export function generateSeoTitles(title: string, description: string): string[] {
-  const cleanTitle = smartCapitalize(title);
-  const lowerDesc = description.toLowerCase();
+  const fullText = (title + " " + description).toLowerCase();
 
-  // Estrazione colore e taglia per migliorare il SEO
-  const colors = ['Nero', 'Bianco', 'Blu', 'Rosso', 'Verde', 'Grigio', 'Giallo', 'Marrone', 'Rosa', 'Arancione'];
-  const sizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '40', '42', '44', '46', '48', '50', '52'];
+  // 1. Marca
+  const brands = ['Anthony Morato', 'Nike', 'Zara', 'Levis', 'Adidas', 'Gucci', 'Prada', 'Jordan', 'Stone Island', 'Carhartt', 'Stussy', 'Ralph Lauren'];
+  const brand = brands.find(b => fullText.includes(b.toLowerCase())) || "";
 
-  const detectedColor = colors.find(c => lowerDesc.includes(c.toLowerCase())) || '';
-  const detectedSize = sizes.find(s => {
-    const regex = new RegExp(`\\b${s}\\b`, 'i');
-    return lowerDesc.match(regex);
-  }) || '';
+  // 2. Stile (virali)
+  const styles = ['Old Money', 'Y2K', 'Vintage', 'Streetwear', 'Gorpcore', 'Minimal', 'Luxury', 'Casual', 'Indie', 'Cyber'];
+  const style = styles.find(s => fullText.includes(s.toLowerCase())) || "";
 
-  const brandMatch = title.match(/(anthony morato|nike|zara|levis|adidas|gucci|prada)/i);
-  const brand = brandMatch ? smartCapitalize(brandMatch[0]) : "";
+  // 3. Fit
+  const fits = ['Oversize', 'Skinny', 'Baggy', 'Regular', 'Slim', 'Boxy', 'Relaxed', 'Tapered'];
+  const fit = fits.find(f => fullText.includes(f.toLowerCase())) || "";
 
-  // Se il brand è già nel titolo, non lo duplichiamo
-  let seoBase = cleanTitle;
-  if (brand && !cleanTitle.toLowerCase().includes(brand.toLowerCase())) {
-    seoBase = `${brand} ${cleanTitle}`;
-  }
+  // 4. Nome generico (virali)
+  const names = ['Pants', 'Hoodie', 'Tee', 'Cap', 'Sneakers', 'Jacket', 'Jeans', 'Sweatshirt', 'Accessory', 'Bag', 'Vest', 'Shorts'];
+  const foundName = names.find(n => fullText.includes(n.toLowerCase()));
 
-  const baseTitle = `${seoBase} ${detectedColor} ${detectedSize}`.replace(/\s+/g, ' ').trim();
-  const variantA = `${baseTitle} - Ottimo Stato`;
-  const variantB = `Vintage ${baseTitle} - Style Unico`;
+  // Pulizia del titolo originale per il nome generico
+  let cleanName = title;
+  if (brand) cleanName = cleanName.replace(new RegExp(brand, 'gi'), '').trim();
+  if (style) cleanName = cleanName.replace(new RegExp(style, 'gi'), '').trim();
+  if (fit) cleanName = cleanName.replace(new RegExp(fit, 'gi'), '').trim();
 
-  return [baseTitle, variantA, variantB].map(t => t.substring(0, 70));
+  const name = foundName || smartCapitalize(cleanName);
+
+  // Formato: [BRAND] [STYLE] [FIT] [NAME]
+  const baseTitle = [brand, style, fit, name]
+    .filter(Boolean)
+    .join(" ")
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // Suggeriamo varianti con viral tags se mancano nel main
+  const isClothing = /felpa|maglia|pantalone|jeans|giacca|t-shirt|shirt|pants|hoodie/i.test(fullText);
+  const isShoes = /scarpe|sneakers|jordan|nike|adidas|dunk/i.test(fullText);
+
+  const vA_style = style || (isClothing ? "Old Money" : (isShoes ? "Streetwear" : "Vintage"));
+  const vA_fit = fit || (isClothing ? "Oversize" : (isShoes ? "Classic" : ""));
+  const variantA = [brand, vA_style, vA_fit, name].filter(Boolean).join(" ");
+
+  const vB_style = style || (isClothing ? "Y2K" : (isShoes ? "Gorpcore" : "Trendy"));
+  const vB_fit = fit || (isClothing ? "Baggy" : "");
+  const variantB = [brand, vB_style, vB_fit, name].filter(Boolean).join(" ");
+
+  return [baseTitle, variantA, variantB].map(t => smartCapitalize(t).substring(0, 70));
 }
 
-export function generateDescription(input: ListingInput): string {
-  const { title, description, useEmoji } = input;
+export function enrichData(title: string, description: string) {
+  const fullText = (title + " " + description).toLowerCase();
+  const addedInfo: string[] = [];
+  let itemName = "";
 
-  const brandMatch = title.match(/(anthony morato|nike|zara|levis|adidas|gucci|prada)/i);
-  const brand = brandMatch ? smartCapitalize(brandMatch[0]) : "";
-
-  const technicalInfo = interpretTechnicalDetails(description);
-
-  // Creazione di una narrazione "umana" e "radiosa"
-  const intro = `Ciao! Se stai cercando un capo che unisca stile e qualità, questo articolo fa proprio al caso tuo. `;
-
-  const body = `Si tratta di un pezzo ${brand ? `firmato ${brand}` : 'molto bello'}, tenuto con una cura incredibile e pronto per vivere una nuova storia nel tuo guardaroba. `;
-
-  const details = `L'articolo si presenta in condizioni davvero ottime, esattamente come puoi vedere dalle foto. ${technicalInfo ? `Ecco qualche dettaglio in più: ${technicalInfo}. ` : ''}`;
-
-  const closing = `La vestibilità è fantastica e il design è pensato per non passare inosservato. Resto a tua completa disposizione se desideri ricevere misure millimetriche o scatti fotografici extra per apprezzare ogni minimo dettaglio. Un'occasione da non perdere, ti aspetto in chat!`;
-
-  let finalDesc = `${intro}${body}${details}${closing}`;
-
-  // Rimuove eventuali Markdown residui e pulisce spazi
-  finalDesc = finalDesc.replace(/\*\*/g, '').replace(/\s+/g, ' ').trim();
-
-  if (useEmoji) {
-    const emojis = ["✨", "💎", "🌟", "🔥", "📸", "📦", "🇮🇹", "🧶"];
-    // Inserisce emoji in punti strategici
-    finalDesc = `✨ ${finalDesc.replace('.', '. 🌟').replace('!', '! 💎')}`;
-    if (finalDesc.length > 500) {
-      finalDesc += " 📸";
-    }
+  if (fullText.includes("jordan 4 military")) {
+    itemName = "Jordan 4 Retro Military Blue";
+    addedInfo.push("SKU: FV5029-141");
+    addedInfo.push("Release Date: Maggio 2024");
+    addedInfo.push("Colorway: Off-White/Military Blue/Neutral Grey");
+  } else if (fullText.includes("jordan 1 high chicago")) {
+    itemName = "Jordan 1 High OG Chicago Lost and Found";
+    addedInfo.push("SKU: DZ5485-612");
+    addedInfo.push("Colorway: Varsity Red/Black-Sail-Muslin");
+  } else if (fullText.includes("stone island") && (fullText.includes("felpa") || fullText.includes("maglione"))) {
+    addedInfo.push("Certilogo: Presente per verifica autenticità");
   }
 
-  return finalDesc;
+  return addedInfo.length > 0 ? { addedInfo, itemName } : null;
+}
+
+export function generateDescription(input: ListingInput, enrichment: any): string {
+  const { title, description, useEmoji } = input;
+  const fullText = (title + " " + description).toLowerCase();
+
+  const isGarment = /felpa|hoodie|pants|pantaloni|t-shirt|tee|maglia|giacca|jacket|jeans|maglione/i.test(fullText);
+  const isShoes = /scarpe|sneakers|jordan|adidas|nike|stivali/i.test(fullText);
+
+  let itemType = "articolo";
+  if (isGarment) itemType = "capo";
+  if (isShoes) itemType = "paio di scarpe";
+
+  const brands = ['Anthony Morato', 'Nike', 'Zara', 'Levis', 'Adidas', 'Gucci', 'Prada', 'Jordan', 'Stone Island'];
+  const brand = brands.find(b => fullText.includes(b.toLowerCase())) || "";
+
+  // Helper per emoji
+  const e = (symbol: string) => useEmoji ? symbol + " " : "";
+
+  // Intro (2-3 righe)
+  let intro = `Ciao! Hai trovato un ${itemType} davvero speciale. ${brand ? `Questo pezzo firmato ${brand}` : `Questo articolo`} è perfetto per chi cerca qualità e uno stile ricercato, tenuto con estrema cura.`;
+
+  if (enrichment) {
+    intro += ` Si tratta del modello ${enrichment.itemName}, un pezzo di grande valore per collezionisti e appassionati.`;
+  }
+
+  // Bullet points
+  const bullets = [];
+
+  // Taglia
+  const sizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46', '48', '50', '52'];
+  const size = sizes.find(s => {
+    const regex = new RegExp(`\\b${s}\\b`, 'i');
+    return fullText.match(regex);
+  });
+  if (size) {
+    bullets.push(`${e(isShoes ? '👟' : '🧥')}taglia ${size.toUpperCase()}`);
+  }
+
+  // Condizioni
+  if (fullText.includes('nuovo') || fullText.includes('mai usato')) {
+    bullets.push(`${e('✨')}come nuovo, mai usato`);
+  } else {
+    bullets.push(`${e('💎')}ottime condizioni, come da foto`);
+  }
+
+  // Arricchimento
+  if (enrichment) {
+    enrichment.addedInfo.forEach((info: string) => {
+      bullets.push(`${e('🔍')}${info}`);
+    });
+  }
+
+  // Materiale/Dettaglio tecnico (se non troppo lungo)
+  const tech = interpretTechnicalDetails(description);
+  if (tech && tech.length < 50 && !tech.includes("Taglia")) {
+    bullets.push(`${e('🧵')}dettagli: ${tech}`);
+  }
+
+  // Assicura che i bullet siano unici e che la spedizione sia l'ultimo
+  const shipText = `${e('📦')}spedizione veloce 1/2 giorni`;
+  let uniqueBullets = Array.from(new Set(bullets)).filter(b => !b.includes("spedizione veloce"));
+
+  // Prendiamo i primi 4-5 e aggiungiamo la spedizione
+  const finalBullets = uniqueBullets.slice(0, 5);
+  finalBullets.push(shipText);
+
+  const closing = "Resto a disposizione per qualsiasi domanda o foto extra!";
+  const finalDesc = `${intro}\n${finalBullets.join('\n')}\n${closing}`;
+
+  return antiSpamChecker(finalDesc.replace(/\*\*/g, '')).trim();
 }
 
 export function suggestCategories(input: string): CategoryOption[] {

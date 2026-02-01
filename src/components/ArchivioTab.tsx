@@ -12,6 +12,26 @@ interface ArchivioTabProps {
 export const ArchivioTab: React.FC<ArchivioTabProps> = ({ archive, onUpdate, onDelete }) => {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'Tutti' | 'Non venduti' | 'Venduti' | 'Da ribassare'>('Tutti');
+  const searchInputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.metaKey && e.key === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+      if (e.metaKey && e.key === 'd' && archive.length > 0) {
+        // Segna come venduto il primo articolo non venduto visibile
+        const firstUnsold = filteredArchive.find(i => i.status === 'Non venduto');
+        if (firstUnsold) {
+          e.preventDefault();
+          onUpdate(firstUnsold.id, { status: 'Venduto' });
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [archive, filteredArchive, onUpdate]);
 
   const filteredArchive = useMemo(() => {
     return archive.filter(item => {
@@ -58,6 +78,7 @@ export const ArchivioTab: React.FC<ArchivioTabProps> = ({ archive, onUpdate, onD
         <div className="relative flex-1 group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-apple-gray group-focus-within:text-apple-blue transition-colors" size={18} />
           <input
+            ref={searchInputRef}
             type="text"
             placeholder="Cerca tra i tuoi articoli..."
             className="apple-input pl-12"
